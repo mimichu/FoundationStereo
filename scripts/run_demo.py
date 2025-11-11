@@ -26,7 +26,7 @@ if __name__=="__main__":
   parser.add_argument('--out_dir', default=f'{code_dir}/../output/', type=str, help='the directory to save results')
   parser.add_argument('--scale', default=1, type=float, help='downsize the image by scale, must be <=1')
   parser.add_argument('--hiera', default=0, type=int, help='hierarchical inference (only needed for high-resolution images (>1K))')
-  parser.add_argument('--z_far', default=10, type=float, help='max depth to clip in point cloud')
+  parser.add_argument('--z_far', default=100, type=float, help='max depth to clip in point cloud')
   parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during forward pass')
   parser.add_argument('--get_pc', type=int, default=1, help='save point cloud output')
   parser.add_argument('--remove_invisible', default=1, type=int, help='remove non-overlapping observations between left and right images from point cloud, so the remaining points are more reliable')
@@ -92,21 +92,30 @@ if __name__=="__main__":
     us_right = xx-disp
     invalid = us_right<0
     disp[invalid] = np.inf
-
+  vis = vis_disparity(disp)
+  vis = np.concatenate([img0_ori, vis], axis=1)
+  imageio.imwrite(f'{args.out_dir}/vis_after_remove_invisible.png', vis)
+  logging.info(f"Output saved to {args.out_dir}")
   if args.get_pc:
     with open(args.intrinsic_file, 'r') as f:
       lines = f.readlines()
       K = np.array(list(map(float, lines[0].rstrip().split()))).astype(np.float32).reshape(3,3)
       baseline = float(lines[1])
+ 
     K[:2] *= scale
-    depth = K[0,0]*baseline/disp
+    depth = K[0,0]*baseline/disp 
+    depth = depth
+ 
     np.save(f'{args.out_dir}/depth_meter.npy', depth)
     xyz_map = depth2xyzmap(depth, K)
     pcd = toOpen3dCloud(xyz_map.reshape(-1,3), img0_ori.reshape(-1,3))
-    keep_mask = (np.asarray(pcd.points)[:,2]>0) & (np.asarray(pcd.points)[:,2]<=args.z_far)
-    keep_ids = np.arange(len(np.asarray(pcd.points)))[keep_mask]
-    pcd = pcd.select_by_index(keep_ids)
+ 
+    # keep_mask = (np.asarray(pcd.points)[:,2]>0) & (np.asarray(pcd.points)[:,2]<=args.z_far)
+    # keep_ids = np.arange(len(np.asarray(pcd.points)))[keep_mask]
+    # pcd = pcd.select_by_index(keep_ids)
+ 
     o3d.io.write_point_cloud(f'{args.out_dir}/cloud.ply', pcd)
+    logging.info(f"np.asarray(pcd.points).shape: {np.asarray(pcd.points).shape}")
     logging.info(f"PCL saved to {args.out_dir}")
 
     if args.denoise_cloud:
@@ -116,12 +125,12 @@ if __name__=="__main__":
       o3d.io.write_point_cloud(f'{args.out_dir}/cloud_denoise.ply', inlier_cloud)
       pcd = inlier_cloud
 
-    logging.info("Visualizing point cloud. Press ESC to exit.")
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-    vis.add_geometry(pcd)
-    vis.get_render_option().point_size = 1.0
-    vis.get_render_option().background_color = np.array([0.5, 0.5, 0.5])
-    vis.run()
-    vis.destroy_window()
+    # logging.info("Visualizing point cloud. Press ESC to exit.")
+    # vis = o3d.visualization.Visualizer()
+    # vis.create_window()
+    # vis.add_geometry(pcd)
+    # vis.get_render_option().point_size = 1.0
+    # vis.get_render_option().background_color = np.array([0.5, 0.5, 0.5])
+    # vis.run()
+    # vis.destroy_window()
 
