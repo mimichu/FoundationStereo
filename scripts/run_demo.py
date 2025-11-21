@@ -104,7 +104,7 @@ if __name__=="__main__":
  
     K[:2] *= scale
     depth = K[0,0]*baseline/disp 
-    depth = depth
+    depth = depth * 1000
  
     np.save(f'{args.out_dir}/depth_meter.npy', depth)
     xyz_map = depth2xyzmap(depth, K)
